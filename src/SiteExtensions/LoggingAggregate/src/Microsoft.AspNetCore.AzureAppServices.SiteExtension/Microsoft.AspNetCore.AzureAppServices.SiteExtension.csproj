@@ -20,7 +20,9 @@
     <IsShipping Condition=" '$(PreReleaseVersionLabel)' == 'preview' ">false</IsShipping>
 
     <!-- Grab packages LB.csproj should have just built. -->
-    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(ArtifactsNonShippingPackagesDir)</RestoreAdditionalProjectSources>
+    <AdditionalPackageSource Condition="('$(BUILD_STAGINGDIRECTORY)' != '' AND Exists('$(BUILD_STAGINGDIRECTORY)\downloaded_packages'))">$(BUILD_STAGINGDIRECTORY)\downloaded_packages</AdditionalPackageSource>
+    <AdditionalPackageSource Condition="Exists('$(ArtifactsNonShippingPackagesDir)')">$(AdditionalPackageSource);$(ArtifactsNonShippingPackagesDir)</AdditionalPackageSource>
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(AdditionalPackageSource)</RestoreAdditionalProjectSources>
   </PropertyGroup>
 
   <ItemGroup>
