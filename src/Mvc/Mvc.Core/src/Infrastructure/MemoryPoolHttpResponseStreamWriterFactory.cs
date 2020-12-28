@@ -4,6 +4,7 @@
 using System;
 using System.Buffers;
 using System.IO;
+using System.IO.Pipelines;
 using System.Text;
 using Microsoft.AspNetCore.WebUtilities;
 
@@ -30,6 +31,7 @@ namespace Microsoft.AspNetCore.Mvc.Infrastructure
         private readonly ArrayPool<byte> _bytePool;
         private readonly ArrayPool<char> _charPool;
 
+        // TODO: remove
         /// <summary>
         /// Creates a new <see cref="MemoryPoolHttpResponseStreamWriterFactory"/>.
         /// </summary>

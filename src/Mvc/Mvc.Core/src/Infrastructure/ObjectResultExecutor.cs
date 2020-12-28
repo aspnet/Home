@@ -6,10 +6,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Pipelines;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Formatters;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -58,6 +60,34 @@ namespace Microsoft.AspNetCore.Mvc.Infrastructure
         }
 
         /// <summary>
+        /// Creates a new <see cref="ObjectResultExecutor"/>.
+        /// </summary>
+        /// <param name="formatterSelector">The <see cref="OutputFormatterSelector"/>.</param>
+        /// <param name="loggerFactory">The <see cref="ILoggerFactory"/>.</param>
+        /// <param name="mvcOptions">Accessor to <see cref="MvcOptions"/>.</param>
+        public ObjectResultExecutor(
+            OutputFormatterSelector formatterSelector,
+            ILoggerFactory loggerFactory,
+            IOptions<MvcOptions> mvcOptions)
+        {
+            if (formatterSelector == null)
+            {
+                throw new ArgumentNullException(nameof(formatterSelector));
+            }
+
+            if (loggerFactory == null)
+            {
+                throw new ArgumentNullException(nameof(loggerFactory));
+            }
+
+            FormatterSelector = formatterSelector;
+            PipeWriterFactory = (writer, encoding) => new HttpResponsePipeWriter(writer, encoding);
+            Logger = loggerFactory.CreateLogger<ObjectResultExecutor>();
+            var options = mvcOptions?.Value ?? throw new ArgumentNullException(nameof(mvcOptions));
+            _asyncEnumerableReaderFactory = new AsyncEnumerableReader(options);
+        }
+
+        /// <summary>
         /// Gets the <see cref="ILogger"/>.
         /// </summary>
         protected ILogger Logger { get; }
@@ -71,6 +101,11 @@ namespace Microsoft.AspNetCore.Mvc.Infrastructure
         /// Gets the writer factory delegate.
         /// </summary>
         protected Func<Stream, Encoding, TextWriter> WriterFactory { get; }
+
+        /// <summary>
+        /// Gets the pipewriter factory delegate.
+        /// </summary>
+        protected Func<PipeWriter, Encoding, TextWriter> PipeWriterFactory { get; }
 
         /// <summary>
         /// Executes the <see cref="ObjectResult"/>.
@@ -121,11 +156,22 @@ namespace Microsoft.AspNetCore.Mvc.Infrastructure
 
         private Task ExecuteAsyncCore(ActionContext context, ObjectResult result, Type objectType, object value)
         {
-            var formatterContext = new OutputFormatterWriteContext(
-                context.HttpContext,
-                WriterFactory,
-                objectType,
-                value);
+            OutputFormatterWriteContext formatterContext;
+            if (PipeWriterFactory != null) {
+                formatterContext = new OutputFormatterWriteContext(
+                    context.HttpContext,
+                    PipeWriterFactory,
+                    objectType,
+                    value);
+            }
+            else
+            {
+                formatterContext = new OutputFormatterWriteContext(
+                    context.HttpContext,
+                    WriterFactory,
+                    objectType,
+                    value);
+            }
 
             var selectedFormatter = FormatterSelector.SelectFormatter(
                 formatterContext,

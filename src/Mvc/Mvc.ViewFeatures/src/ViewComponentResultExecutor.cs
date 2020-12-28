@@ -122,9 +122,11 @@ namespace Microsoft.AspNetCore.Mvc.ViewFeatures
                 response.StatusCode = result.StatusCode.Value;
             }
 
-            _writerFactory ??= context.HttpContext.RequestServices.GetRequiredService<IHttpResponseStreamWriterFactory>();
+            //_writerFactory ??= context.HttpContext.RequestServices.GetRequiredService<IHttpResponseStreamWriterFactory>();
 
-            await using (var writer = _writerFactory.CreateWriter(response.Body, resolvedContentTypeEncoding))
+            await using (var writer = _writerFactory != null
+                ? _writerFactory.CreateWriter(response.Body, resolvedContentTypeEncoding)
+                : new HttpResponsePipeWriter(response.BodyWriter, resolvedContentTypeEncoding))
             {
                 var viewContext = new ViewContext(
                     context,
@@ -150,13 +152,13 @@ namespace Microsoft.AspNetCore.Mvc.ViewFeatures
                 }
                 else
                 {
-                    await using var bufferingStream = new FileBufferingWriteStream();
-                    await using (var intermediateWriter = _writerFactory.CreateWriter(bufferingStream, resolvedContentTypeEncoding))
+                    await using var bufferingStream = new FileBufferingPipeWriter(response.BodyWriter);
+                    await using (var intermediateWriter = new HttpResponsePipeWriter(response.BodyWriter, resolvedContentTypeEncoding))
                     {
                         viewComponentResult.WriteTo(intermediateWriter, _htmlEncoder);
                     }
 
-                    await bufferingStream.DrainBufferAsync(response.Body);
+                    await bufferingStream.DrainBufferAsync();
                 }
             }
         }

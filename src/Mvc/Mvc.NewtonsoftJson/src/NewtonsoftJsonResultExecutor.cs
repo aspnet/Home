@@ -113,17 +113,17 @@ namespace Microsoft.AspNetCore.Mvc.NewtonsoftJson
 
             Log.JsonResultExecuting(_logger, result.Value);
 
-            var responseStream = response.Body;
-            FileBufferingWriteStream fileBufferingWriteStream = null;
+            var responseWriter = response.BodyWriter;
+            FileBufferingPipeWriter fileBufferingWriteStream = null;
             if (!_mvcOptions.SuppressOutputFormatterBuffering)
             {
-                fileBufferingWriteStream = new FileBufferingWriteStream();
-                responseStream = fileBufferingWriteStream;
+                fileBufferingWriteStream = new FileBufferingPipeWriter(responseWriter);
+                responseWriter = fileBufferingWriteStream;
             }
 
             try
             {
-                await using (var writer = _writerFactory.CreateWriter(responseStream, resolvedContentTypeEncoding))
+                await using (var writer = new HttpResponsePipeWriter(responseWriter, resolvedContentTypeEncoding))
                 {
                     using var jsonWriter = new JsonTextWriter(writer);
                     jsonWriter.ArrayPool = _charPool;
@@ -143,7 +143,7 @@ namespace Microsoft.AspNetCore.Mvc.NewtonsoftJson
 
                 if (fileBufferingWriteStream != null)
                 {
-                    await fileBufferingWriteStream.DrainBufferAsync(response.Body);
+                    await fileBufferingWriteStream.DrainBufferAsync();
                 }
             }
             finally
