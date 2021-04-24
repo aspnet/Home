@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>$(DefaultNetCoreTargetFramework)</TargetFramework>
     <Description>Runtime server features for ASP.NET Core Components.</Description>
@@ -85,6 +85,7 @@
     <Compile Include="$(RepoRoot)src\Shared\Components\ServerComponentMarker.cs" />
     <Compile Include="$(RepoRoot)src\Shared\Components\PrerenderComponentApplicationStore.cs" />
     <Compile Include="$(RepoRoot)src\Shared\Components\ProtectedPrerenderComponentApplicationStore.cs" />
+    <Compile Include="$(RepoRoot)src\Shared\Components\PooledByteBufferWritter.cs" />
   </ItemGroup>
 
   <PropertyGroup>

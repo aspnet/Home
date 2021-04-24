@@ -2,58 +2,56 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.Extensions.Logging;
 
-namespace Microsoft.AspNetCore.Components.Lifetime
+namespace Microsoft.AspNetCore.Components.Infrastructure
 {
     /// <summary>
-    /// Manages the lifetime of a component application.
+    /// Manages the persistent state of components in an application.
     /// </summary>
-    public class ComponentApplicationLifetime
+    public class ComponentStatePersistenceManager : IDisposable
     {
         private bool _stateIsPersisted;
-        private List<ComponentApplicationState.OnPersistingCallback> _pauseCallbacks = new();
-        private readonly Dictionary<string, byte[]> _currentState = new();
-        private readonly ILogger<ComponentApplicationLifetime> _logger;
+        private readonly List<Func<Task>> _pauseCallbacks = new();
+        private readonly Dictionary<string, PooledByteBufferWriter> _currentState = new(StringComparer.Ordinal);
+        private readonly ILogger<ComponentStatePersistenceManager> _logger;
 
         /// <summary>
-        /// Initializes a new instance of <see cref="ComponentApplicationLifetime"/>.
+        /// Initializes a new instance of <see cref="ComponentStatePersistenceManager"/>.
         /// </summary>
-        public ComponentApplicationLifetime(ILogger<ComponentApplicationLifetime> logger)
+        public ComponentStatePersistenceManager(ILogger<ComponentStatePersistenceManager> logger)
         {
-            State = new ComponentApplicationState(_currentState, _pauseCallbacks);
+            State = new PersistentComponentState(_currentState, _pauseCallbacks);
             _logger = logger;
         }
 
         /// <summary>
-        /// Gets the <see cref="ComponentApplicationState"/> associated with the <see cref="ComponentApplicationLifetime"/>.
+        /// Gets the <see cref="ComponentStatePersistenceManager"/> associated with the <see cref="ComponentStatePersistenceManager"/>.
         /// </summary>
-        public ComponentApplicationState State { get; }
+        public PersistentComponentState State { get; }
 
         /// <summary>
-        /// Restores the component application state from the given <see cref="IComponentApplicationStateStore"/>.
+        /// Restores the component application state from the given <see cref="IPersistentComponentStateStore"/>.
         /// </summary>
-        /// <param name="store">The <see cref="IComponentApplicationStateStore"/> to restore the application state from.</param>
+        /// <param name="store">The <see cref="IPersistentComponentStateStore"/> to restore the application state from.</param>
         /// <returns>A <see cref="Task"/> that will complete when the state has been restored.</returns>
-        public async Task RestoreStateAsync(IComponentApplicationStateStore store)
+        public async Task RestoreStateAsync(IPersistentComponentStateStore store)
         {
             var data = await store.GetPersistedStateAsync();
             State.InitializeExistingState(data);
         }
 
         /// <summary>
-        /// Persists the component application state into the given <see cref="IComponentApplicationStateStore"/>.
+        /// Persists the component application state into the given <see cref="IPersistentComponentStateStore"/>.
         /// </summary>
-        /// <param name="store">The <see cref="IComponentApplicationStateStore"/> to restore the application state from.</param>
+        /// <param name="store">The <see cref="IPersistentComponentStateStore"/> to restore the application state from.</param>
         /// <param name="renderer">The <see cref="Renderer"/> that components are being rendered.</param>
         /// <returns>A <see cref="Task"/> that will complete when the state has been restored.</returns>
-        public Task PersistStateAsync(IComponentApplicationStateStore store, Renderer renderer)
+        public Task PersistStateAsync(IPersistentComponentStateStore store, Renderer renderer)
         {
             if (_stateIsPersisted)
             {
@@ -66,10 +64,23 @@ namespace Microsoft.AspNetCore.Components.Lifetime
 
             async Task PauseAndPersistState()
             {
+                State.PersistingState = true;
                 await PauseAsync();
+                State.PersistingState = false;
 
-                var data = new ReadOnlyDictionary<string, byte[]>(_currentState);
+                var data = new Dictionary<string, ReadOnlySequence<byte>>(StringComparer.Ordinal);
+                foreach (var (key, value) in _currentState)
+                {
+                    data[key] = new ReadOnlySequence<byte>(value.WrittenMemory);
+                }
+
                 await store.PersistStateAsync(data);
+
+                foreach (var value in _currentState.Values)
+                {
+                    value.Dispose();
+                }
+                _currentState.Clear();
             }
         }
 
@@ -77,7 +88,7 @@ namespace Microsoft.AspNetCore.Components.Lifetime
         {
             List<Task>? pendingCallbackTasks = null;
 
-            for (int i = 0; i < _pauseCallbacks.Count; i++)
+            for (var i = 0; i < _pauseCallbacks.Count; i++)
             {
                 var callback = _pauseCallbacks[i];
                 var result = ExecuteCallback(callback, _logger);
@@ -97,7 +108,7 @@ namespace Microsoft.AspNetCore.Components.Lifetime
                 return Task.CompletedTask;
             }
 
-            static Task ExecuteCallback(ComponentApplicationState.OnPersistingCallback callback, ILogger<ComponentApplicationLifetime> logger)
+            static Task ExecuteCallback(Func<Task> callback, ILogger<ComponentStatePersistenceManager> logger)
             {
                 try
                 {
@@ -117,7 +128,7 @@ namespace Microsoft.AspNetCore.Components.Lifetime
                     return Task.CompletedTask;
                 }
 
-                static async Task Awaited(Task task, ILogger<ComponentApplicationLifetime> logger)
+                static async Task Awaited(Task task, ILogger<ComponentStatePersistenceManager> logger)
                 {
                     try
                     {
@@ -130,6 +141,15 @@ namespace Microsoft.AspNetCore.Components.Lifetime
                     }
                 }
             }
+        }
+
+        void IDisposable.Dispose()
+        {
+            foreach (var value in _currentState.Values)
+            {
+                value.Dispose();
+            }
+            _currentState.Clear();
         }
     }
 }

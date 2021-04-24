@@ -4,7 +4,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Components.Lifetime;
+using Microsoft.AspNetCore.Components.Infrastructure;
 using Microsoft.AspNetCore.Components.WebAssembly.HotReload;
 using Microsoft.AspNetCore.Components.WebAssembly.Infrastructure;
 using Microsoft.AspNetCore.Components.WebAssembly.Rendering;
@@ -137,7 +137,7 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
             // This is the earliest opportunity to fetch satellite assemblies for this selection.
             await cultureProvider.LoadCurrentCultureResourcesAsync();
 
-            var manager = Services.GetRequiredService<ComponentApplicationLifetime>();
+            var manager = Services.GetRequiredService<ComponentStatePersistenceManager>();
             var store = !string.IsNullOrEmpty(_persistedState) ?
                 new PrerenderComponentApplicationStore(_persistedState) :
                 new PrerenderComponentApplicationStore();

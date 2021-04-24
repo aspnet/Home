@@ -1,6 +1,7 @@
-﻿@inject ComponentApplicationState AppState
+﻿@inject PersistentComponentState AppState
 @inject PreserveStateService PreserveService
 @using System.Text
+@using System.Buffers
 
 <p id="@($"state-{State}")">@State: @_state</p>
 
@@ -43,7 +44,7 @@
 
     protected override void OnInitialized()
     {
-        if (AppState.TryTakePersistedState(State, out var preserved))
+        if (AppState.TryTake(State, out var preserved))
         {
             _state = Encoding.UTF8.GetString(preserved);
             _restored = true;
@@ -51,19 +52,25 @@
         else
         {
             _state = Guid.NewGuid().ToString();
-            AppState.PersistState(State, Encoding.UTF8.GetBytes(_state));
+            AppState.Persist(State, writer => WriteUtf8Bytes(writer, _state));
             _extraState = Guid.NewGuid().ToString();
             if(ExtraState != null)
             {
                 _extraStateAvailable = true;
-                AppState.PersistState(ExtraState, Encoding.UTF8.GetBytes(_extraState));
+                AppState.Persist(ExtraState, writer => WriteUtf8Bytes(writer, _extraState));
             }
+        }
+
+        static void WriteUtf8Bytes(IBufferWriter<byte> writer, string state)
+        {
+            var bytes = Encoding.UTF8.GetBytes(state);
+            writer.Write(bytes);
         }
     }
 
     public void DisplayExtraState()
     {
-        if (AppState.TryTakePersistedState(ExtraState, out var extraState))
+        if (AppState.TryTake(ExtraState, out var extraState))
         {
             _extraStateAvailable = true;
             _extraState = Encoding.UTF8.GetString(extraState);

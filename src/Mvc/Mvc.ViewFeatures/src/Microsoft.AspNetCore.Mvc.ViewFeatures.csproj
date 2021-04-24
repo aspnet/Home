@@ -38,6 +38,7 @@
     <Compile Include="$(RepoRoot)src\Shared\Components\ComponentParameter.cs" />
     <Compile Include="$(SharedSourceRoot)Components\PrerenderComponentApplicationStore.cs" />
     <Compile Include="$(SharedSourceRoot)Components\ProtectedPrerenderComponentApplicationStore.cs" />
+    <Compile Include="$(RepoRoot)src\Shared\Components\PooledByteBufferWritter.cs" />
   </ItemGroup>
 
 </Project>
