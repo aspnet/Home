@@ -211,22 +211,22 @@ namespace Microsoft.Extensions.Diagnostics.HealthChecks
             // These are separate so they can have different log levels
             private static readonly string HealthCheckEndText = "Health check {HealthCheckName} with status {HealthStatus} completed after {ElapsedMilliseconds}ms with message '{HealthCheckDescription}'";
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string?, Exception?> _healthCheckEndHealthy = LoggerMessage.Define<string, double, HealthStatus, string?>(
+            private static readonly Action<ILogger, string, HealthStatus, double, string?, Exception?> _healthCheckEndHealthy = LoggerMessage.Define<string, HealthStatus,  double, string?>(
                 LogLevel.Debug,
                 EventIds.HealthCheckEnd,
                 HealthCheckEndText);
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string?, Exception?> _healthCheckEndDegraded = LoggerMessage.Define<string, double, HealthStatus, string?>(
+            private static readonly Action<ILogger, string, HealthStatus, double, string?, Exception?> _healthCheckEndDegraded = LoggerMessage.Define<string, HealthStatus,  double, string?>(
                 LogLevel.Warning,
                 EventIds.HealthCheckEnd,
                 HealthCheckEndText);
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string?, Exception?> _healthCheckEndUnhealthy = LoggerMessage.Define<string, double, HealthStatus, string?>(
+            private static readonly Action<ILogger, string, HealthStatus, double, string?, Exception?> _healthCheckEndUnhealthy = LoggerMessage.Define<string, HealthStatus,  double, string?>(
                 LogLevel.Error,
                 EventIds.HealthCheckEnd,
                 HealthCheckEndText);
 
-            private static readonly Action<ILogger, string, double, HealthStatus, string?, Exception?> _healthCheckEndFailed = LoggerMessage.Define<string, double, HealthStatus, string?>(
+            private static readonly Action<ILogger, string, HealthStatus, double, string?, Exception?> _healthCheckEndFailed = LoggerMessage.Define<string, HealthStatus, double, string?>(
                 LogLevel.Error,
                 EventIds.HealthCheckEnd,
                 HealthCheckEndText);
@@ -256,15 +256,15 @@ namespace Microsoft.Extensions.Diagnostics.HealthChecks
                 switch (entry.Status)
                 {
                     case HealthStatus.Healthy:
-                        _healthCheckEndHealthy(logger, registration.Name, duration.TotalMilliseconds, entry.Status, entry.Description, null);
+                        _healthCheckEndHealthy(logger, registration.Name, entry.Status, duration.TotalMilliseconds, entry.Description, null);
                         break;
 
                     case HealthStatus.Degraded:
-                        _healthCheckEndDegraded(logger, registration.Name, duration.TotalMilliseconds, entry.Status, entry.Description, null);
+                        _healthCheckEndDegraded(logger, registration.Name, entry.Status, duration.TotalMilliseconds, entry.Description, null);
                         break;
 
                     case HealthStatus.Unhealthy:
-                        _healthCheckEndUnhealthy(logger, registration.Name, duration.TotalMilliseconds, entry.Status, entry.Description, entry.Exception);
+                        _healthCheckEndUnhealthy(logger, registration.Name, entry.Status, duration.TotalMilliseconds, entry.Description, entry.Exception);
                         break;
                 }
             }
