@@ -26,7 +26,7 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
     public sealed class WebAssemblyHostBuilder
     {
         private Func<IServiceProvider> _createServiceProvider;
-        private RootComponentTypeCache? _rootComponentCache;
+        private RootComponentTypeCache _rootComponentCache = new();
         private string? _persistedState;
 
         /// <summary>
@@ -64,6 +64,7 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
             // less opinionated.
             Configuration = new WebAssemblyHostConfiguration();
             RootComponents = new RootComponentMappingCollection();
+            DynamicComponentDefinitions = new();
             Services = new ServiceCollection();
             Logging = new LoggingBuilder(Services);
 
@@ -104,7 +105,6 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
             var componentDeserializer = WebAssemblyComponentParameterDeserializer.Instance;
             foreach (var registeredComponent in registeredComponents)
             {
-                _rootComponentCache = new RootComponentTypeCache();
                 var componentType = _rootComponentCache.GetRootComponent(registeredComponent.Assembly!, registeredComponent.TypeName!);
                 if (componentType is null)
                 {
@@ -173,6 +173,11 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
         public RootComponentMappingCollection RootComponents { get; }
 
         /// <summary>
+        /// Gets the collection of root component mappings configured for the application.
+        /// </summary>
+        public DynamicComponentCollection DynamicComponentDefinitions { get; }
+
+        /// <summary>
         /// Gets the service collection.
         /// </summary>
         public IServiceCollection Services { get; }
@@ -236,7 +241,13 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
             var services = _createServiceProvider();
             var scope = services.GetRequiredService<IServiceScopeFactory>().CreateAsyncScope();
 
-            return new WebAssemblyHost(services, scope, Configuration, RootComponents, _persistedState);
+            return new WebAssemblyHost(
+                services,
+                scope,
+                Configuration,
+                RootComponents,
+                DynamicComponentDefinitions,
+                _persistedState);
         }
 
         internal void InitializeDefaultServices()

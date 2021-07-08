@@ -9,9 +9,11 @@ using Microsoft.AspNetCore.Components.Lifetime;
 using Microsoft.AspNetCore.Components.WebAssembly.HotReload;
 using Microsoft.AspNetCore.Components.WebAssembly.Infrastructure;
 using Microsoft.AspNetCore.Components.WebAssembly.Rendering;
+using Microsoft.AspNetCore.Components.WebAssembly.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 
 namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
 {
@@ -25,6 +27,7 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
         private readonly IServiceProvider _services;
         private readonly IConfiguration _configuration;
         private readonly RootComponentMappingCollection _rootComponents;
+        private readonly DynamicComponentCollection _dynamicComponents;
         private readonly string? _persistedState;
 
         // NOTE: the host is disposable because it OWNs references to disposable things.
@@ -39,12 +42,14 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
         private bool _disposed;
         private bool _started;
         private WebAssemblyRenderer? _renderer;
+        private RendererHandle? _rendererHandle;
 
         internal WebAssemblyHost(
             IServiceProvider services,
             AsyncServiceScope scope,
             IConfiguration configuration,
             RootComponentMappingCollection rootComponents,
+            DynamicComponentCollection dynamicComponents,
             string? persistedState)
         {
             // To ensure JS-invoked methods don't get linked out, have a reference to their enclosing types
@@ -54,6 +59,7 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
             _scope = scope;
             _configuration = configuration;
             _rootComponents = rootComponents;
+            _dynamicComponents = dynamicComponents;
             _persistedState = persistedState;
         }
 
@@ -149,6 +155,13 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
             {
                 var loggerFactory = Services.GetRequiredService<ILoggerFactory>();
                 _renderer = new WebAssemblyRenderer(Services, loggerFactory);
+                var jsRuntime = _scope.ServiceProvider.GetRequiredService<IJSRuntime>();
+                _rendererHandle = new RendererHandle(
+                    _renderer,
+                    _dynamicComponents,
+                    DefaultWebAssemblyJSRuntime.Instance.ReadJsonSerializerOptions());
+
+                await _rendererHandle.Initialize(DefaultWebAssemblyJSRuntime.Instance);
 
                 var initializationTcs = new TaskCompletionSource();
                 WebAssemblyCallQueue.Schedule((_rootComponents, _renderer, initializationTcs), static async state =>
@@ -157,7 +170,7 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Hosting
 
                     try
                     {
-                foreach (var rootComponent in rootComponents)
+                        foreach (var rootComponent in rootComponents)
                         {
                             await renderer.AddComponentAsync(rootComponent.ComponentType, rootComponent.Selector, rootComponent.Parameters);
                         }

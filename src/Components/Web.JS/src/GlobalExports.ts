@@ -8,10 +8,13 @@ import { DefaultReconnectionHandler } from './Platform/Circuits/DefaultReconnect
 import { CircuitStartOptions } from './Platform/Circuits/CircuitStartOptions';
 import { WebAssemblyStartOptions } from './Platform/WebAssemblyStartOptions';
 import { Platform, Pointer, System_String, System_Array, System_Object, System_Boolean, System_Byte, System_Int } from './Platform/Platform';
+import { ComponentProxy, IComponentRenderer } from './Rendering/DynamicComponents';
+import { DotNet } from '@microsoft/dotnet-js-interop';
 
 interface IBlazor {
   navigateTo: (uri: string, options: NavigationOptions) => void;
   registerCustomEventType: (eventName: string, options: EventTypeOptions) => void;
+  renderRootComponent?: (typeNameOrAlias: string, targetElement: HTMLElement, parameters: object) => Promise<ComponentProxy>;
 
   disconnect?: () => void;
   reconnect?: (existingConnection?: HubConnection) => Promise<boolean>;
@@ -31,6 +34,7 @@ interface IBlazor {
     retrieveByteArray?: () => System_Object;
     getPersistedState?: () => System_String;
     attachRootComponentToElement?: (arg0: any, arg1: any, arg2: any) => void;
+    detachRootComponentFromElement?: (selector: string, componentId: number, rendererId: number) => void;
     registeredComponents?: {
       getRegisteredComponentsCount: () => number,
       getId: (index) => number,
@@ -53,6 +57,7 @@ interface IBlazor {
     // APIs invoked by hot reload
     applyHotReload?: (id: string, metadataDelta: string, ilDelta: string) => void,
     getApplyUpdateCapabilities?: () => string,
+    setComponentRenderer?: (renderer: DotNet.DotNetObject) => void,
   }
 }
 

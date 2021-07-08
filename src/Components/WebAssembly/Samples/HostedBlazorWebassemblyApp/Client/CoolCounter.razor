@@ -1,0 +1,30 @@
+﻿<p>Current count: @currentCount, Step: @Increment, MaxCount: @MaxCount</p>
+<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+
+@code {
+	private int currentCount = 0;
+	private int _increment = 0;
+	private IReadOnlyDictionary<string, object>? _dictionary;
+
+	[Parameter] public int Increment { get; set; }
+
+	[Parameter] public int MaxCount { get; set; }
+
+	[Parameter] public EventCallback MaxCountReached { get; set; }
+
+    private async Task IncrementCount()
+    {
+        currentCount+= Increment;
+		if(currentCount >= MaxCount)
+		{
+			await MaxCountReached.InvokeAsync();
+		}
+    }
+
+	public override async Task SetParametersAsync(ParameterView parameters)
+	{
+		_dictionary = parameters.ToDictionary();
+		 await base.SetParametersAsync(parameters);
+		_increment = parameters.GetValueOrDefault<int>(nameof(Increment));
+	}
+}

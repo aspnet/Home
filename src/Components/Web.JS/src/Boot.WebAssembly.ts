@@ -3,7 +3,7 @@ import { DotNet } from '@microsoft/dotnet-js-interop';
 import { Blazor } from './GlobalExports';
 import * as Environment from './Environment';
 import { byteArrayBeingTransferred, monoPlatform } from './Platform/Mono/MonoPlatform';
-import { renderBatch, getRendererer, attachRootComponentToElement, attachRootComponentToLogicalElement } from './Rendering/Renderer';
+import { renderBatch, getRendererer, attachRootComponentToElement, attachRootComponentToLogicalElement, detachRootComponentFromElement } from './Rendering/Renderer';
 import { SharedMemoryRenderBatch } from './Rendering/RenderBatch/SharedMemoryRenderBatch';
 import { shouldAutoStart } from './BootCommon';
 import { setEventDispatcher } from './Rendering/Events/EventDispatcher';
@@ -15,6 +15,7 @@ import { WebAssemblyStartOptions } from './Platform/WebAssemblyStartOptions';
 import { WebAssemblyComponentAttacher } from './Platform/WebAssemblyComponentAttacher';
 import { discoverComponents, discoverPersistedState, WebAssemblyComponentDescriptor } from './Services/ComponentDescriptorDiscovery';
 import { WasmInputFile } from './WasmInputFile';
+import { ComponentProxy } from './Rendering/DynamicComponents';
 
 declare var Module: EmscriptenModule;
 let started = false;
@@ -118,6 +119,37 @@ async function boot(options?: Partial<WebAssemblyStartOptions>): Promise<void> {
       attachRootComponentToLogicalElement(rendererId, element, componentId);
     }
   };
+
+  Blazor._internal.detachRootComponentFromElement = (selector, componentId, rendererId) => {
+    const dynamicComponent = componentAttacher.resolveRegisteredElement(selector);
+    if (dynamicComponent != undefined) {
+      detachRootComponentFromElement(componentId, dynamicComponent, rendererId);
+    }
+  }
+
+  Blazor._internal.setComponentRenderer = (renderer) => {
+    if (Blazor.renderRootComponent) {
+      throw new Error('Component renderer already initialized.');
+    }
+
+    const componentRenderer = renderer;
+    Blazor.renderRootComponent = async (elementName: string, targetElement: HTMLElement, parameters: object): Promise<ComponentProxy> => {
+      const proxy = componentAttacher.registerDynamicComponent(targetElement);
+      // TODO: Should `renderRootComponent` on the dotnet side wait until the component has fully rendered the first time to return
+      // the handle?
+
+      const proxyAsJSObjectRef = DotNet.createJSObjectReference(proxy);
+
+      const componentHandle = await componentRenderer.invokeMethodAsync<DotNet.DotNetObject>(
+        'RenderRootComponent',
+        elementName,
+        proxy.id.toString(),
+        proxyAsJSObjectRef,
+        parameters);
+      proxy.setHandler(componentHandle);
+      return proxy;
+    };
+  }
 
   const bootConfigResult = await bootConfigPromise;
   const [resourceLoader] = await Promise.all([

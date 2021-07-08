@@ -144,7 +144,7 @@ namespace Microsoft.AspNetCore.Components.RenderTree
                 {
                     foreach (var (componentState, initialParameters) in _rootComponents)
                     {
-                        componentState.SetDirectParameters(initialParameters);
+                        _ = componentState.SetDirectParameters(initialParameters);
                     }
                 }
                 finally
@@ -235,7 +235,7 @@ namespace Microsoft.AspNetCore.Components.RenderTree
                 _rootComponents.Add((componentState, initialParameters.Clone()));
             }
 
-            componentState.SetDirectParameters(initialParameters);
+            _ = componentState.SetDirectParameters(initialParameters);
 
             try
             {
@@ -246,6 +246,64 @@ namespace Microsoft.AspNetCore.Components.RenderTree
             {
                 _pendingTasks = null;
             }
+        }
+
+        /// <summary>
+        /// Removes a root component from the renderer along with any contents this component is currently rendering in the DOM.
+        /// </summary>
+        /// <param name="componentId">The ID for the root component</param>
+        /// <returns></returns>
+        protected Task RemoveRootComponent(int componentId)
+        {
+            var componentState = _componentStateById[componentId];
+            // Force rendering an empty fragment to dispose all children components.
+            _batchBuilder.ComponentRenderQueue.Enqueue(new RenderQueueEntry(componentState, builder => { }));
+            // If there were a pending render in place (there shouldn't) the method below will throw.
+            ProcessPendingRender();
+            // Once this component is disposed it won't be able to trigger more renders, since everything up to the disposal happens
+            // synchronously there's no way that anything else gets queued in the mean time.
+            if (componentState.Component is IAsyncDisposable asyncDisposable)
+            {
+                DisposeComponentAsynchronously(asyncDisposable, out var exception, out var disposeTask);
+                if (exception != null)
+                {
+                    HandleException(exception);
+                }
+                else if (disposeTask != null)
+                {
+                    return HandleAsyncExceptions(disposeTask);
+                }
+            }
+            else if (componentState.Component is IDisposable)
+            {
+                HandleException(DisposeComponentSynchronously(componentState));
+            }
+
+            return Task.CompletedTask;
+
+            async Task HandleAsyncExceptions(Task task)
+            {
+                try
+                {
+                    await task;
+                }
+                catch (Exception exception)
+                {
+                    HandleException(exception);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Sets the parameters for the component with the given <paramref name="componentId"/>.
+        /// </summary>
+        /// <param name="componentId">The component id.</param>
+        /// <param name="parameters">The new parameters.</param>
+        /// <returns>A <see cref="Task"/> that will complete when the app finishes applying parameters.</returns>
+        protected Task SetComponentParametersAsync(int componentId, ParameterView parameters)
+        {
+            var state = GetRequiredComponentState(componentId);
+            return state.SetDirectParameters(parameters);
         }
 
         /// <summary>
@@ -915,30 +973,24 @@ namespace Microsoft.AspNetCore.Components.RenderTree
                 // forever.
                 if (componentState.Component is IAsyncDisposable asyncDisposable)
                 {
-                    try
+                    DisposeComponentAsynchronously(asyncDisposable, out var exception, out var unfinishedTask);
+                    if (exception != null)
                     {
-                        var task = asyncDisposable.DisposeAsync();
-                        if (!task.IsCompletedSuccessfully)
-                        {
-                            asyncDisposables ??= new();
-                            asyncDisposables.Add(task.AsTask());
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        exceptions ??= new List<Exception>();
+                        exceptions ??= new();
                         exceptions.Add(exception);
                     }
-                }
-                else if (componentState.Component is IDisposable disposable)
-                {
-                    try
+                    if (unfinishedTask != null)
                     {
-                        componentState.Dispose();
+                        asyncDisposables ??= new();
+                        asyncDisposables.Add(unfinishedTask);
                     }
-                    catch (Exception exception)
+                }
+                else if (componentState.Component is IDisposable)
+                {
+                    var exception = DisposeComponentSynchronously(componentState);
+                    if (exception != null)
                     {
-                        exceptions ??= new List<Exception>();
+                        exceptions ??= new();
                         exceptions.Add(exception);
                     }
                 }
@@ -984,6 +1036,38 @@ namespace Microsoft.AspNetCore.Components.RenderTree
                 {
                     HandleException(exceptions[0]);
                 }
+            }
+        }
+
+        private static Exception DisposeComponentSynchronously(ComponentState component)
+        {
+            try
+            {
+                component.Dispose();
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+
+            return null;
+        }
+
+        private static void DisposeComponentAsynchronously(IAsyncDisposable asyncDisposable, out Exception exception, out Task disposeTask)
+        {
+            disposeTask = null;
+            exception = null;
+            try
+            {
+                var task = asyncDisposable.DisposeAsync();
+                if (!task.IsCompletedSuccessfully)
+                {
+                    disposeTask = task.AsTask();
+                }
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
             }
         }
 

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.RenderTree;
@@ -21,6 +22,8 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Rendering
     {
         private readonly ILogger _logger;
         private readonly int _webAssemblyRendererId;
+
+        private readonly Dictionary<int, ComponentProxy> _dynamicComponentsById = new();
 
         /// <summary>
         /// Constructs an instance of <see cref="WebAssemblyRenderer"/>.
@@ -84,6 +87,57 @@ namespace Microsoft.AspNetCore.Components.WebAssembly.Rendering
                 _webAssemblyRendererId);
 
             return RenderRootComponentAsync(componentId, parameters);
+        }
+
+        public ComponentProxy AddDynamicComponentAsync([DynamicallyAccessedMembers(Component)] Type componentType, string domElementSelector, ParameterView parameters)
+        {
+            var component = InstantiateComponent(componentType);
+            var componentId = AssignRootComponentId(component);
+
+            // The only reason we're calling this synchronously is so that, if it throws,
+            // we get the exception back *before* attempting the first UpdateDisplayAsync
+            // (otherwise the logged exception will come from UpdateDisplayAsync instead of here)
+            // When implementing support for out-of-process runtimes, we'll need to call this
+            // asynchronously and ensure we surface any exceptions correctly.
+
+            DefaultWebAssemblyJSRuntime.Instance.Invoke<object>(
+                "Blazor._internal.attachRootComponentToElement",
+                domElementSelector,
+                componentId,
+                _webAssemblyRendererId);
+
+            // TODO: Should this do error handling?
+            // We don't want to wait to finish rendering, otherwise the component can't be operated on until the rendering is finished.
+            // We also need to ensure that rendering is "Synchronous" so as to play well with other frameworks.
+            // It's likely that we need to "attach" an error dispatcher to the proxy so that we can raise errors on the JavaScript side.
+            // It'll be interesting to determine whether these errors must be fatal or not, and how to handle them.
+            _ = RenderRootComponentAsync(componentId, parameters);
+
+            var componentProxy = new ComponentProxy(this, domElementSelector, componentId);
+
+            // We want to keep track of the proxy to make sure we can invalidate it in case we need to do so.
+            _dynamicComponentsById[componentId] = componentProxy;
+
+            return componentProxy;
+        }
+
+        public async Task RemoveDynamicComponentAsync(int componentId)
+        {
+            await RemoveRootComponent(componentId);
+
+            var component = _dynamicComponentsById[componentId];
+            _dynamicComponentsById.Remove(componentId);
+
+            DefaultWebAssemblyJSRuntime.Instance.Invoke<object>(
+                "Blazor._internal.detachRootComponentFromElement",
+                component.Selector,
+                componentId,
+                _webAssemblyRendererId);
+        }
+
+        public Task SetDynamicComponentParameters(int componentId, ParameterView parameters)
+        {
+            return SetComponentParametersAsync(componentId, parameters);
         }
 
         /// <inheritdoc />
