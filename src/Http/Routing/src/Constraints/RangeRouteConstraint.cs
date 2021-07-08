@@ -10,7 +10,7 @@ namespace Microsoft.AspNetCore.Routing.Constraints
     /// <summary>
     /// Constraints a route parameter to be an integer within a given range of values.
     /// </summary>
-    public class RangeRouteConstraint : IRouteConstraint
+    public class RangeRouteConstraint : IRouteConstraint, ILiteralConstraint
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="RangeRouteConstraint" /> class.
@@ -61,13 +61,24 @@ namespace Microsoft.AspNetCore.Routing.Constraints
             if (values.TryGetValue(routeKey, out var value) && value != null)
             {
                 var valueString = Convert.ToString(value, CultureInfo.InvariantCulture);
-                if (long.TryParse(valueString, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
-                {
-                    return longValue >= Min && longValue <= Max;
-                }
+                return CheckConstraintCore(valueString);
             }
 
             return false;
+        }
+
+        private bool CheckConstraintCore(string? valueString)
+        {
+            if (long.TryParse(valueString, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
+            {
+                return longValue >= Min && longValue <= Max;
+            }
+            return false;
+        }
+
+        bool ILiteralConstraint.MatchLiteral(string parameterName, string literal)
+        {
+            return CheckConstraintCore(literal);
         }
     }
 }

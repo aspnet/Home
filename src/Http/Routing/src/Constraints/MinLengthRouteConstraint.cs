@@ -10,7 +10,7 @@ namespace Microsoft.AspNetCore.Routing.Constraints
     /// <summary>
     /// Constrains a route parameter to be a string with a minimum length.
     /// </summary>
-    public class MinLengthRouteConstraint : IRouteConstraint
+    public class MinLengthRouteConstraint : IRouteConstraint, ILiteralConstraint
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="MinLengthRouteConstraint" /> class.
@@ -53,10 +53,20 @@ namespace Microsoft.AspNetCore.Routing.Constraints
             if (values.TryGetValue(routeKey, out var value) && value != null)
             {
                 var valueString = Convert.ToString(value, CultureInfo.InvariantCulture)!;
-                return valueString.Length >= MinLength;
+                return CheckConstraintCore(valueString);
             }
 
             return false;
+        }
+
+        private bool CheckConstraintCore(string valueString)
+        {
+            return valueString.Length >= MinLength;
+        }
+
+        bool ILiteralConstraint.MatchLiteral(string parameterName, string literal)
+        {
+            return CheckConstraintCore(literal);
         }
     }
 }

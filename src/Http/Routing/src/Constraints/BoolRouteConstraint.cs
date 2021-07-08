@@ -10,7 +10,7 @@ namespace Microsoft.AspNetCore.Routing.Constraints
     /// <summary>
     /// Constrains a route parameter to represent only Boolean values.
     /// </summary>
-    public class BoolRouteConstraint : IRouteConstraint
+    public class BoolRouteConstraint : IRouteConstraint, ILiteralConstraint
     {
         /// <inheritdoc />
         public bool Match(
@@ -38,10 +38,20 @@ namespace Microsoft.AspNetCore.Routing.Constraints
                 }
 
                 var valueString = Convert.ToString(value, CultureInfo.InvariantCulture);
-                return bool.TryParse(valueString, out _);
+                return CheckConstraintCore(valueString);
             }
 
             return false;
+        }
+
+        private static bool CheckConstraintCore(string? valueString)
+        {
+            return bool.TryParse(valueString, out _);
+        }
+
+        bool ILiteralConstraint.MatchLiteral(string parameterName, string literal)
+        {
+            return CheckConstraintCore(literal);
         }
     }
 }

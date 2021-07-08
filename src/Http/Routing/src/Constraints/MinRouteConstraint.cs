@@ -10,7 +10,7 @@ namespace Microsoft.AspNetCore.Routing.Constraints
     /// <summary>
     /// Constrains a route parameter to be a long with a minimum value.
     /// </summary>
-    public class MinRouteConstraint : IRouteConstraint
+    public class MinRouteConstraint : IRouteConstraint, ILiteralConstraint
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="MinRouteConstraint" /> class.
@@ -47,13 +47,24 @@ namespace Microsoft.AspNetCore.Routing.Constraints
             if (values.TryGetValue(routeKey, out var value) && value != null)
             {
                 var valueString = Convert.ToString(value, CultureInfo.InvariantCulture);
-                if (long.TryParse(valueString, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
-                {
-                    return longValue >= Min;
-                }
+                return CheckConstraintCore(valueString);
             }
 
             return false;
+        }
+
+        private bool CheckConstraintCore(string? valueString)
+        {
+            if (long.TryParse(valueString, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
+            {
+                return longValue >= Min;
+            }
+            return false;
+        }
+
+        bool ILiteralConstraint.MatchLiteral(string parameterName, string literal)
+        {
+            return CheckConstraintCore(literal);
         }
     }
 }

@@ -12,7 +12,7 @@ namespace Microsoft.AspNetCore.Routing.Constraints
     /// Matches values specified in any of the five formats "N", "D", "B", "P", or "X",
     /// supported by Guid.ToString(string) and Guid.ToString(String, IFormatProvider) methods.
     /// </summary>
-    public class GuidRouteConstraint : IRouteConstraint
+    public class GuidRouteConstraint : IRouteConstraint, ILiteralConstraint
     {
         /// <inheritdoc />
         public bool Match(
@@ -40,10 +40,20 @@ namespace Microsoft.AspNetCore.Routing.Constraints
                 }
 
                 var valueString = Convert.ToString(value, CultureInfo.InvariantCulture);
-                return Guid.TryParse(valueString, out _);
+                return CheckConstraintCore(valueString);
             }
 
             return false;
+        }
+
+        private static bool CheckConstraintCore(string? valueString)
+        {
+            return Guid.TryParse(valueString, out _);
+        }
+
+        bool ILiteralConstraint.MatchLiteral(string parameterName, string literal)
+        {
+            return CheckConstraintCore(literal);
         }
     }
 }
