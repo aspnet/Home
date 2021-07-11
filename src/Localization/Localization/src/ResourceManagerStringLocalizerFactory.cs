@@ -1,5 +1,5 @@
-// Copyright (c) .NET Foundation. All rights reserved. 
-// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information. 
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Concurrent;
@@ -153,13 +153,20 @@ namespace Microsoft.Extensions.Localization
                 throw new ArgumentNullException(nameof(resourceSource));
             }
 
-            var typeInfo = resourceSource.GetTypeInfo();
+            // Get without Add to prevent unnecessary lambda allocation
+            if (_localizerCache.TryGetValue(resourceSource.AssemblyQualifiedName!, out var localizer))
+            {
+                return localizer;
+            }
 
-            var baseName = GetResourcePrefix(typeInfo);
+            return _localizerCache.GetOrAdd(resourceSource.AssemblyQualifiedName!, _ =>
+            {
+                var typeInfo = resourceSource.GetTypeInfo();
+                var baseName = GetResourcePrefix(typeInfo);
+                var assembly = typeInfo.Assembly;
 
-            var assembly = typeInfo.Assembly;
-
-            return _localizerCache.GetOrAdd(baseName, _ => CreateResourceManagerStringLocalizer(assembly, baseName));
+                return CreateResourceManagerStringLocalizer(assembly, baseName);
+            });
         }
 
         /// <summary>
