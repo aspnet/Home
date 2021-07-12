@@ -160,9 +160,9 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         [Fact]
         public async Task ControlStream_ServerToClient_ErrorInitializing_ConnectionError()
         {
-            OnCreateServerControlStream = () =>
+            OnCreateServerControlStream = testStreamContext =>
             {
-                var controlStream = new Http3ControlStream(this, StreamInitiator.Server);
+                var controlStream = new Http3ControlStream(this, testStreamContext);
 
                 // Make server connection error when trying to write to control stream.
                 controlStream.StreamContext.Transport.Output.Complete();
@@ -203,6 +203,56 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
 
             Assert.Equal(Internal.Http3.Http3SettingType.MaxFieldSectionSize, maxFieldSetting.Key);
             Assert.Equal(100, maxFieldSetting.Value);
+        }
+
+        [Fact]
+        public async Task StreamPool_MultipleStreamsInSequence_PooledStreamReused()
+        {
+            var headers = new[]
+            {
+                new KeyValuePair<string, string>(HeaderNames.Method, "Custom"),
+                new KeyValuePair<string, string>(HeaderNames.Path, "/"),
+                new KeyValuePair<string, string>(HeaderNames.Scheme, "http"),
+                new KeyValuePair<string, string>(HeaderNames.Authority, "localhost:80"),
+            };
+
+            await InitializeConnectionAsync(_echoApplication);
+
+            var requestStream = await CreateRequestStream();
+            var streamContext1 = requestStream.StreamContext;
+
+            await requestStream.SendHeadersAsync(headers);
+            await requestStream.SendDataAsync(Encoding.ASCII.GetBytes("Hello world 1"), endStream: true);
+
+            Assert.False(requestStream.Disposed);
+
+            await requestStream.ExpectHeadersAsync();
+            var responseData = await requestStream.ExpectDataAsync();
+            Assert.Equal("Hello world 1", Encoding.ASCII.GetString(responseData.ToArray()));
+
+            await requestStream.ExpectReceiveEndOfStream();
+
+            await requestStream.OnStreamCompletedTask.DefaultTimeout();
+
+            Assert.True(requestStream.Disposed);
+
+            requestStream = await CreateRequestStream();
+            var streamContext2 = requestStream.StreamContext;
+
+            await requestStream.SendHeadersAsync(headers);
+            await requestStream.SendDataAsync(Encoding.ASCII.GetBytes("Hello world 2"), endStream: true);
+
+            Assert.False(requestStream.Disposed);
+
+            await requestStream.ExpectHeadersAsync();
+            responseData = await requestStream.ExpectDataAsync();
+            Assert.Equal("Hello world 2", Encoding.ASCII.GetString(responseData.ToArray()));
+
+            await requestStream.ExpectReceiveEndOfStream();
+
+            Assert.True(requestStream.Disposed);
+
+            Assert.Same(streamContext1, streamContext2);
         }
     }
 }
