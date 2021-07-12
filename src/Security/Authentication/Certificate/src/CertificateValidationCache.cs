@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.Http;
@@ -43,8 +44,12 @@ namespace Microsoft.AspNetCore.Authentication.Certificate
         /// <param name="certificate">The certificate.</param>
         /// <param name="result">the <see cref="AuthenticateResult"/></param>
         public void Put(HttpContext context, X509Certificate2 certificate, AuthenticateResult result)
-            => _cache.Set(ComputeKey(certificate), result.Clone(), new MemoryCacheEntryOptions()
-                .SetSize(1).SetSlidingExpiration(_options.CacheEntryExpiration).SetAbsoluteExpiration(certificate.NotAfter));
+        {
+            // Cache expired certs for little while too
+            var absExpiration = (certificate.NotAfter < DateTime.Now) ? DateTime.Now + _options.CacheEntryExpiration : certificate.NotAfter;
+            _cache.Set(ComputeKey(certificate), result.Clone(), new MemoryCacheEntryOptions()
+                .SetSize(1).SetSlidingExpiration(_options.CacheEntryExpiration).SetAbsoluteExpiration(absExpiration));
+        }
 
         private string ComputeKey(X509Certificate2 certificate)
             => certificate.GetCertHashString(HashAlgorithmName.SHA256);
