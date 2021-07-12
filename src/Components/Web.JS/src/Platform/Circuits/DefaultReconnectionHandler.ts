@@ -36,11 +36,15 @@ export class DefaultReconnectionHandler implements ReconnectionHandler {
       this._currentReconnectionProcess = null;
     }
   }
+
+  onConnectionRejected(options: ReconnectionOptions) {
+    if (options.reloadOnCircuitRejected) {
+      location.reload();
+    }
+  }
 };
 
 class ReconnectionProcess {
-  static readonly MaximumFirstRetryInterval = 3000;
-
   readonly reconnectDisplay: ReconnectDisplay;
   isDisposed = false;
 
@@ -58,12 +62,6 @@ class ReconnectionProcess {
   async attemptPeriodicReconnection(options: ReconnectionOptions) {
     for (let i = 0; i < options.maxRetries; i++) {
       this.reconnectDisplay.update(i + 1);
-
-      const delayDuration = i == 0 && options.retryIntervalMilliseconds > ReconnectionProcess.MaximumFirstRetryInterval
-                            ? ReconnectionProcess.MaximumFirstRetryInterval
-                            : options.retryIntervalMilliseconds;
-      await this.delay(delayDuration);
-
       if (this.isDisposed) {
         break;
       }
@@ -76,7 +74,7 @@ class ReconnectionProcess {
         const result = await this.reconnectCallback();
         if (!result) {
           // If the server responded and refused to reconnect, stop auto-retrying.
-          this.reconnectDisplay.rejected();
+          this.reconnectDisplay.rejected();       
           return;
         }
         return;
@@ -84,6 +82,7 @@ class ReconnectionProcess {
         // We got an exception so will try again momentarily
         this.logger.log(LogLevel.Error, err);
       }
+      await this.delay(options.retryIntervalMilliseconds);
     }
 
     this.reconnectDisplay.failed();
