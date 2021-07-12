@@ -435,6 +435,8 @@ namespace Microsoft.AspNetCore.Certificates.Generation
 
         public abstract bool IsTrusted(X509Certificate2 certificate);
 
+        public virtual bool SupportsTrust => false;
+
         protected abstract X509Certificate2 SaveCertificateCore(X509Certificate2 certificate, StoreName storeName, StoreLocation storeLocation);
 
         protected abstract void TrustCertificateCore(X509Certificate2 certificate);
@@ -445,7 +447,7 @@ namespace Microsoft.AspNetCore.Certificates.Generation
 
         protected abstract IList<X509Certificate2> GetCertificatesToRemove(StoreName storeName, StoreLocation storeLocation);
 
-        internal void ExportCertificate(X509Certificate2 certificate, string path, bool includePrivateKey, string? password, CertificateKeyExportFormat format)
+        internal static void ExportCertificate(X509Certificate2 certificate, string path, bool includePrivateKey, string? password, CertificateKeyExportFormat format)
         {
             if (Log.IsEnabled())
             {
@@ -970,6 +972,12 @@ namespace Microsoft.AspNetCore.Certificates.Generation
 
             [Event(64, Level = EventLevel.Error, Message = "The provided certificate '{0}' is not a valid ASP.NET Core HTTPS development certificate.")]
             internal void NoHttpsDevelopmentCertificate(string description) => WriteEvent(64, description);
+
+            [Event(65, Level = EventLevel.Informational, Message = "Adding '{0}' to '{1}'.")]
+            internal void LinuxTrustCertificate(string certificate, string storeName) => WriteEvent(65, certificate, storeName);
+
+            [Event(66, Level = EventLevel.Error, Message = "An error has occurred while running command '{0}' to install certificate. Exit code: {1}. Error: {2}.")]
+            internal void LinuxCertificateInstallCommandFailed(string command, int exitCode, string stderr) => WriteEvent(66, command, exitCode, stderr);
         }
 
         internal class UserCancelledTrustException : Exception

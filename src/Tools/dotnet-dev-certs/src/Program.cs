@@ -254,6 +254,8 @@ namespace Microsoft.AspNetCore.DeveloperCertificates.Tools
                         "require elevated privileges. If that is the case, a prompt for credentials will be displayed.");
                 }
 
+                // TODO: check if system tools are available for deleting certificates.
+
                 manager.CleanupHttpsCertificates();
                 reporter.Output("HTTPS development certificates successfully removed from the machine.");
                 return Success;
@@ -296,32 +298,21 @@ namespace Microsoft.AspNetCore.DeveloperCertificates.Tools
 
             if (trust != null && trust.HasValue())
             {
-                if(!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                var trustedCertificates = certificates.Where(c => certificateManager.IsTrusted(c)).ToList();
+                if (!trustedCertificates.Any())
                 {
-                    var trustedCertificates = certificates.Where(c => certificateManager.IsTrusted(c)).ToList();
-                    if (!trustedCertificates.Any())
-                    {
-                        reporter.Output($@"The following certificates were found, but none of them is trusted: {CertificateManager.ToCertificateDescription(certificates)}");
-                        return ErrorCertificateNotTrusted;
-                    }
-                    else
-                    {
-                        ReportCertificates(reporter, trustedCertificates, "trusted");
-                    }
+                    reporter.Output($@"The following certificates were found, but none of them is trusted: {CertificateManager.ToCertificateDescription(certificates)}");
+                    return ErrorCertificateNotTrusted;
                 }
                 else
                 {
-                    reporter.Warn("Checking the HTTPS development certificate trust status was requested. Checking whether the certificate is trusted or not is not supported on Linux distributions." +
-                        "For instructions on how to manually validate the certificate is trusted on your Linux distribution, go to https://aka.ms/dev-certs-trust");
+                    ReportCertificates(reporter, trustedCertificates, "trusted");
                 }
             }
             else
             {
                 ReportCertificates(reporter, validCertificates, "valid");
-                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    reporter.Output("Run the command with both --check and --trust options to ensure that the certificate is not only valid but also trusted.");
-                }
+                reporter.Output("Run the command with both --check and --trust options to ensure that the certificate is not only valid but also trusted.");
             }
 
             return Success;
@@ -361,25 +352,34 @@ namespace Microsoft.AspNetCore.DeveloperCertificates.Tools
 
             if (trust?.HasValue() == true)
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                if (!manager.SupportsTrust)
                 {
-                    reporter.Warn("Trusting the HTTPS development certificate was requested. If the certificate is not " +
-                        "already trusted we will run the following command:" + Environment.NewLine +
-                        "'sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <<certificate>>'" +
-                        Environment.NewLine + "This command might prompt you for your password to install the certificate " +
-                        "on the system keychain.");
+                    reporter.Warn("Trusting the HTTPS development certificate was requested. Trusting the certificate automatically is not supported on this distribition. " +
+                        "For instructions on how to manually trust the certificate, go to https://aka.ms/dev-certs-trust");
                 }
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                else
                 {
-                    reporter.Warn("Trusting the HTTPS development certificate was requested. A confirmation prompt will be displayed " +
-                        "if the certificate was not previously trusted. Click yes on the prompt to trust the certificate.");
-                }
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        reporter.Warn("Trusting the HTTPS development certificate was requested. If the certificate is not " +
+                            "already trusted we will run the following command:" + Environment.NewLine +
+                            "'sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <<certificate>>'" +
+                            Environment.NewLine + "This command might prompt you for your password to install the certificate " +
+                            "on the system keychain.");
+                    }
 
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    reporter.Warn("Trusting the HTTPS development certificate was requested. Trusting the certificate on Linux distributions automatically is not supported. " +
-                        "For instructions on how to manually trust the certificate on your Linux distribution, go to https://aka.ms/dev-certs-trust");
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        reporter.Warn("Trusting the HTTPS development certificate was requested. A confirmation prompt will be displayed " +
+                            "if the certificate was not previously trusted. Click yes on the prompt to trust the certificate.");
+                    }
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                    {
+                        reporter.Warn("Trusting the HTTPS development certificate was requested. If the certificate is not " +
+                            "already trusted we will run commands using 'sudo'." +
+                            Environment.NewLine + "This might prompt you for your password.");
+                    }
                 }
             }
 
@@ -390,11 +390,13 @@ namespace Microsoft.AspNetCore.DeveloperCertificates.Tools
                 return InvalidKeyExportFormat;
             }
 
+            // TODO: check if system tools are available for trusting certificates.
+
             var result = manager.EnsureAspNetCoreHttpsDevelopmentCertificate(
                 now,
                 now.Add(HttpsCertificateValidity),
                 exportPath.Value(),
-                trust == null ? false : trust.HasValue() && !RuntimeInformation.IsOSPlatform(OSPlatform.Linux),
+                trust == null ? false : trust.HasValue() && manager.SupportsTrust,
                 password.HasValue() || (noPassword.HasValue() && format == CertificateKeyExportFormat.Pem),
                 password.Value(),
                 exportFormat.HasValue() ? format : CertificateKeyExportFormat.Pfx);

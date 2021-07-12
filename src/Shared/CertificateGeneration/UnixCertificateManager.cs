@@ -2,10 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 
+#nullable enable
+
 namespace Microsoft.AspNetCore.Certificates.Generation
 {
     internal class UnixCertificateManager : CertificateManager
     {
+        private List<CertificateStore>? _certificateStores;
+
+        private List<CertificateStore> CertificateStores
+            => _certificateStores ??= CertificateStoreFinder.FindCertificateStores();
+
         public UnixCertificateManager()
         {
         }
@@ -15,7 +22,22 @@ namespace Microsoft.AspNetCore.Certificates.Generation
         {
         }
 
-        public override bool IsTrusted(X509Certificate2 certificate) => false;
+        public override bool IsTrusted(X509Certificate2 certificate)
+        {
+            // TODO: support 'partial' return.
+
+            // Return true when all stores trust the cert.
+            foreach (var store in CertificateStores)
+            {
+                if (!store.HasCertificate(certificate))
+                {
+                    return false;
+                }
+            }
+            return CertificateStores.Count > 0;
+        }
+
+        public override bool SupportsTrust => CertificateStores.Count > 0;
 
         protected override X509Certificate2 SaveCertificateCore(X509Certificate2 certificate, StoreName storeName, StoreLocation storeLocation)
         {
@@ -47,12 +69,22 @@ namespace Microsoft.AspNetCore.Certificates.Generation
 
         protected override bool IsExportable(X509Certificate2 c) => true;
 
-        protected override void TrustCertificateCore(X509Certificate2 certificate) =>
-            throw new InvalidOperationException("Trusting the certificate is not supported on linux");
+        protected override void TrustCertificateCore(X509Certificate2 certificate)
+        {
+            foreach (var store in CertificateStores)
+            {
+                CertificateManager.Log.LinuxTrustCertificate(CertificateManager.GetDescription(certificate), store.StoreName);
+                store.TryInstallCertificate(certificate);
+                // TODO: handle failure.
+            }
+        }
 
         protected override void RemoveCertificateFromTrustedRoots(X509Certificate2 certificate)
         {
-            // No-op here as is benign
+            foreach (var store in CertificateStores)
+            {
+                store.DeleteCertificate(certificate);
+            }
         }
 
         protected override IList<X509Certificate2> GetCertificatesToRemove(StoreName storeName, StoreLocation storeLocation)
