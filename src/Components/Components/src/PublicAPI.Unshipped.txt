@@ -42,6 +42,12 @@ Microsoft.AspNetCore.Components.NavigationOptions.ReplaceHistoryEntry.get -> boo
 Microsoft.AspNetCore.Components.NavigationOptions.ReplaceHistoryEntry.init -> void
 Microsoft.AspNetCore.Components.RenderHandle.IsRenderingOnMetadataUpdate.get -> bool
 Microsoft.AspNetCore.Components.RenderTree.Renderer.RemoveRootComponent(int componentId) -> void
+Microsoft.AspNetCore.Components.Rendering.ParameterViewBuilder
+Microsoft.AspNetCore.Components.Rendering.ParameterViewBuilder.Add(string! name, object? value) -> void
+Microsoft.AspNetCore.Components.Rendering.ParameterViewBuilder.Clear() -> void
+Microsoft.AspNetCore.Components.Rendering.ParameterViewBuilder.Dispose() -> void
+Microsoft.AspNetCore.Components.Rendering.ParameterViewBuilder.ParameterViewBuilder() -> void
+Microsoft.AspNetCore.Components.Rendering.ParameterViewBuilder.ToParameterView() -> Microsoft.AspNetCore.Components.ParameterView
 Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder.Dispose() -> void
 Microsoft.AspNetCore.Components.Routing.Router.PreferExactMatches.get -> bool
 Microsoft.AspNetCore.Components.Routing.Router.PreferExactMatches.set -> void

@@ -3,6 +3,7 @@
 
 using System.ComponentModel;
 using System.Text.Json;
+using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.JSInterop;
 
 namespace Microsoft.AspNetCore.Components.Web
@@ -23,6 +24,7 @@ namespace Microsoft.AspNetCore.Components.Web
         private readonly Func<int, ParameterView, Task> _renderRootComponentAsync;
         private readonly Action<int> _removeRootComponent;
         private readonly Dictionary<string, Type> _allowedComponentTypes = new(StringComparer.Ordinal);
+        private readonly ParameterViewBuilder _parameterViewBuilder = new();
 
         /// <summary>
         /// 
@@ -84,8 +86,36 @@ namespace Microsoft.AspNetCore.Components.Web
         /// </summary>
         [JSInvokable]
         public Task RenderRootComponentAsync(int componentId, JsonElement parameters)
-            // TODO: Some way to supply parameters from JS
-            => _renderRootComponentAsync(componentId, ParameterView.Empty);
+        {
+            try
+            {
+                // TODO: Use the [Parameter] attributes on the component type to create a precached
+                // JsonElement->ParameterView parser that respects the declared parameter types, not
+                // the actual types in the JSON data.
+                foreach (var jsonElement in parameters.EnumerateObject())
+                {
+                    switch (jsonElement.Value.ValueKind)
+                    {
+                        case JsonValueKind.Number:
+                            _parameterViewBuilder.Add(jsonElement.Name, jsonElement.Value.GetInt32());
+                            break;
+                        case JsonValueKind.String:
+                            _parameterViewBuilder.Add(jsonElement.Name, jsonElement.Value.GetString());
+                            break;
+                        case JsonValueKind.True:
+                        case JsonValueKind.False:
+                            _parameterViewBuilder.Add(jsonElement.Name, jsonElement.Value.GetBoolean());
+                            break;
+                    }
+                }
+
+                return _renderRootComponentAsync(componentId, _parameterViewBuilder.ToParameterView());
+            }
+            finally
+            {
+                _parameterViewBuilder.Clear();
+            }
+        }
 
         /// <summary>
         /// For framework use only.
@@ -96,6 +126,9 @@ namespace Microsoft.AspNetCore.Components.Web
 
         /// <inheritdoc />
         public void Dispose()
-            => _selfReference.Dispose();
+        {
+            _parameterViewBuilder.Dispose();
+            _selfReference.Dispose();
+        }
     }
 }
