@@ -113,6 +113,9 @@ namespace Microsoft.AspNetCore.Components.Web
             }
             finally
             {
+                // ParameterView instances are backed by ArrayBuilder which in turn is pooled. We can't
+                // allow the recipient to continue iterating over it after it may have been returned to
+                // the pool. Clearing the builder also invalidates its ParameterView instances.
                 _parameterViewBuilder.Clear();
             }
         }

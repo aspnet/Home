@@ -8,9 +8,10 @@ namespace Microsoft.AspNetCore.Components.Rendering
     /// <summary>
     /// Provides a mechanism for building a <see cref="ParameterView" />.
     /// </summary>
-    public sealed class ParameterViewBuilder : IDisposable
+    public sealed class ParameterViewBuilder : IDisposable, IParameterViewLifetimeOwner
     {
         private const string GeneratedParameterViewElementName = "__ARTIFICIAL_PARAMETER_VIEW";
+        private int _parameterViewValidityStamp;
 
         internal ArrayBuilder<RenderTreeFrame> ReferenceFramesBuffer { get; } = new ArrayBuilder<RenderTreeFrame>(64);
 
@@ -22,12 +23,14 @@ namespace Microsoft.AspNetCore.Components.Rendering
             Clear();
         }
 
+        int IParameterViewLifetimeOwner.ParameterViewValidityStamp => _parameterViewValidityStamp;
+
         /// <summary>
         /// Clears the instance so that it can be used to build a new <see cref="ParameterView" />.
         /// </summary>
         public void Clear()
         {
-            // TODO: Invalidate the parameterview lifetime
+            _parameterViewValidityStamp++; // Overflow is fine
             ReferenceFramesBuffer.Clear();
             ReferenceFramesBuffer.Append(RenderTreeFrame.Element(0, GeneratedParameterViewElementName));
         }
@@ -39,7 +42,7 @@ namespace Microsoft.AspNetCore.Components.Rendering
         /// <param name="value">The value of the parameter.</param>
         public void Add(string name, object? value)
         {
-            // TODO: Invalidate the parameterview lifetime
+            _parameterViewValidityStamp++; // Overflow is fine
             ReferenceFramesBuffer.Append(RenderTreeFrame.Attribute(1, name, value));
         }
 
@@ -50,10 +53,10 @@ namespace Microsoft.AspNetCore.Components.Rendering
         /// <returns>The <see cref="ParameterView" />.</returns>
         public ParameterView ToParameterView()
         {
-            // TODO: Don't use ParameterViewLifetime.Unbound
             ReferenceFramesBuffer.Buffer[0].ElementSubtreeLengthField = ReferenceFramesBuffer.Count;
-            return new ParameterView(ParameterViewLifetime.Unbound,
-                ReferenceFramesBuffer.Buffer, 0);
+
+            var lifetime = new ParameterViewLifetime(this);
+            return new ParameterView(lifetime, ReferenceFramesBuffer.Buffer, 0);
         }
 
         /// <inheritdoc />

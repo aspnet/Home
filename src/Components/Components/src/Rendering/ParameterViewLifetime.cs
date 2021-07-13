@@ -7,12 +7,12 @@ namespace Microsoft.AspNetCore.Components.Rendering
 {
     internal readonly struct ParameterViewLifetime
     {
-        private readonly RenderBatchBuilder _owner;
+        private readonly IParameterViewLifetimeOwner _owner;
         private readonly int _stamp;
 
         public static readonly ParameterViewLifetime Unbound;
 
-        public ParameterViewLifetime(RenderBatchBuilder owner)
+        public ParameterViewLifetime(IParameterViewLifetimeOwner owner)
         {
             _owner = owner;
             _stamp = owner.ParameterViewValidityStamp;

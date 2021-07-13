@@ -13,7 +13,7 @@ namespace Microsoft.AspNetCore.Components.Rendering
     /// and the intermediate states (such as the queue of components still to
     /// be rendered).
     /// </summary>
-    internal class RenderBatchBuilder : IDisposable
+    internal class RenderBatchBuilder : IDisposable, IParameterViewLifetimeOwner
     {
         // A value that, if changed, causes expiry of all ParameterView instances issued
         // for this RenderBatchBuilder. This is to prevent invalid reads from arrays that
