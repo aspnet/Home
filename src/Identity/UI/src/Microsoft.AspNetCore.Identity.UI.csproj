@@ -39,7 +39,7 @@
 
   <Target Name="SetupRazorInputs" BeforeTargets="ResolveRazorGenerateInputs">
     <ItemGroup>
-      <_RazorGenerate Include="Areas\Identity\Pages\V4\**\*.cshtml" />
+      <_RazorGenerate Include="Areas\Identity\Pages\V5\**\*.cshtml" />
 
       <RazorGenerate Include="@(_RazorGenerate)" Link="Areas\Identity\Pages\%(RecursiveDir)%(Filename)%(Extension)" />
     </ItemGroup>
@@ -50,15 +50,16 @@
     <ItemGroup>
       <StaticWebAsset Remove="@(StaticWebAsset)" />
 
-      <_V4Content Include="wwwroot\V4\**" />
+      <_V5Content Include="wwwroot\V5\**" />
 
-      <StaticWebAsset Include="@(_V4Content->'%(FullPath)')">
+      <StaticWebAsset Include="@(_V5Content->'%(FullPath)')">
         <SourceType></SourceType>
         <SourceId>Microsoft.AspNetCore.Identity.UI</SourceId>
-        <ContentRoot>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)wwwroot/V4'))</ContentRoot>
+        <ContentRoot>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)wwwroot/V5'))</ContentRoot>
         <BasePath>/Identity</BasePath>
         <RelativePath>%(RecursiveDir)%(FileName)%(Extension)</RelativePath>
       </StaticWebAsset>
+
     </ItemGroup>
 
   </Target>
