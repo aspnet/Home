@@ -5,7 +5,6 @@ namespace Microsoft.AspNetCore.Http
 {
     internal static class ContentTypeConstants
     {
-        public const string PlainTextContentType = "text/plain";
         public const string PlainTextContentTypeWithCharset = "text/plain; charset=utf-8";
     }
 }

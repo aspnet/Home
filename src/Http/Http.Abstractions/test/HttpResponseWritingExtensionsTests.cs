@@ -32,12 +32,12 @@ namespace Microsoft.AspNetCore.Http
         }
 
         [Fact]
-        public async Task WritingText_When_ContentType_IsNull_SetPlainText()
+        public async Task WritingText_When_ContentType_IsNull()
         {
             HttpContext context = CreateRequest();
             await context.Response.WriteAsync("Hello World");
 
-            Assert.Equal(ContentTypeConstants.PlainTextContentTypeWithCharset, context.Response.ContentType);
+            Assert.Null(context.Response.ContentType);
         }
 
         [Theory]
