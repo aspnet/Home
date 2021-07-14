@@ -14,8 +14,8 @@ namespace Microsoft.AspNetCore.Components.Server.Circuits
     {
         private readonly RemoteJSRuntime _runtime;
         private readonly long _streamId;
-        private readonly long _totalLength;
         private readonly TimeSpan _jsInteropDefaultCallTimeout;
+        private readonly long _totalLength;
         private readonly CancellationToken _streamCancellationToken;
         private readonly Stream _pipeReaderStream;
         private readonly Pipe _pipe;
@@ -71,8 +71,8 @@ namespace Microsoft.AspNetCore.Components.Server.Circuits
         {
             _runtime = runtime;
             _streamId = streamId;
-            _totalLength = totalLength;
             _jsInteropDefaultCallTimeout = jsInteropDefaultCallTimeout;
+            _totalLength = totalLength;
             _streamCancellationToken = cancellationToken;
 
             _lastDataReceivedTime = DateTimeOffset.UtcNow;
@@ -94,9 +94,6 @@ namespace Microsoft.AspNetCore.Components.Server.Circuits
         {
             try
             {
-                _lastDataReceivedTime = DateTimeOffset.UtcNow;
-                _ = ThrowOnTimeout();
-
                 if (!string.IsNullOrEmpty(error))
                 {
                     throw new InvalidOperationException($"An error occurred while reading the remote stream: {error}");
@@ -111,7 +108,7 @@ namespace Microsoft.AspNetCore.Components.Server.Circuits
 
                 if (chunk.Length == 0)
                 {
-                    throw new EndOfStreamException($"The incoming data chunk cannot be empty.");
+                    throw new EndOfStreamException("The incoming data chunk cannot be empty.");
                 }
 
                 _bytesRead += chunk.Length;
@@ -120,6 +117,10 @@ namespace Microsoft.AspNetCore.Components.Server.Circuits
                 {
                     throw new EndOfStreamException($"The incoming data stream declared a length {_totalLength}, but {_bytesRead} bytes were sent.");
                 }
+
+                // Start timeout _after_ performing validations on data.
+                _lastDataReceivedTime = DateTimeOffset.UtcNow;
+                _ = ThrowOnTimeout();
 
                 await _pipe.Writer.WriteAsync(chunk, _streamCancellationToken);
 
