@@ -1215,6 +1215,47 @@ namespace Microsoft.AspNetCore.Components
             return false;
         }
 
+        internal readonly static BindParser<Guid> ConvertToGuid = ConvertToGuidCore;
+        internal readonly static BindParser<Guid?> ConvertToNullableGuid = ConvertToNullableGuidCore;
+
+        private static bool ConvertToGuidCore(object? obj, CultureInfo? culture, out Guid value)
+        {
+            var text = (string?)obj;
+            if (string.IsNullOrEmpty(text))
+            {
+                value = default;
+                return false;
+            }
+
+            if (!Guid.TryParse(text, out var converted))
+            {
+                value = default;
+                return false;
+            }
+
+            value = converted;
+            return true;
+        }
+
+        private static bool ConvertToNullableGuidCore(object? obj, CultureInfo? culture, out Guid? value)
+        {
+            var text = (string?)obj;
+            if (string.IsNullOrEmpty(text))
+            {
+                value = default;
+                return false;
+            }
+
+            if (!Guid.TryParse(text, out var converted))
+            {
+                value = default;
+                return false;
+            }
+
+            value = converted;
+            return true;
+        }
+
         private static bool ConvertToEnum<T>(object? obj, CultureInfo? culture, out T value) where T : struct, Enum
         {
             var text = (string?)obj;
@@ -1543,6 +1584,14 @@ namespace Microsoft.AspNetCore.Components
                     else if (typeof(T) == typeof(DateTimeOffset?))
                     {
                         parser = ConvertToNullableDateTime;
+                    }
+                    else if (typeof(T) == typeof(Guid))
+                    {
+                        parser = ConvertToGuid;
+                    }
+                    else if (typeof(T) == typeof(Guid?))
+                    {
+                        parser = ConvertToNullableGuid;
                     }
                     else if (typeof(T).IsEnum)
                     {
